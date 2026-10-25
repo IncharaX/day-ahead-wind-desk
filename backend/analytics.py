@@ -71,21 +71,29 @@ def metrics(errors: pd.DataFrame) -> dict[str, float | int | None]:
     }
 
 
-def add_prior_error_bands(errors: pd.DataFrame, min_samples: int = 20) -> pd.DataFrame:
-    """Add P10/P90 error bands using strictly earlier delivery dates.
+def add_prior_error_bands(
+    errors: pd.DataFrame, min_samples: int = 20, lag_days: int = 2
+) -> pd.DataFrame:
+    """Add P10/P90 error bands using fully observed delivery dates only.
 
     A matching half-hour horizon is preferred. If it has fewer than `min_samples`,
     all prior horizons are used; if that is still sparse, the band is null.
+
+    For a D-1 morning decision, D-1 actuals are incomplete. `lag_days=2`
+    ensures the history for delivery day D ends at D-2.
     """
     if min_samples < 1:
         raise ValueError("min_samples must be positive")
+    if lag_days < 1:
+        raise ValueError("lag_days must be positive")
     output = errors.copy()
     output["p10_error_mw"] = np.nan
     output["p90_error_mw"] = np.nan
     output["band_sample_count"] = 0
-    prior: list[pd.DataFrame] = []
     for delivery_day, same_day in output.groupby("delivery_date", sort=True):
-        history = pd.concat(prior, ignore_index=True) if prior else pd.DataFrame(columns=output.columns)
+        history = output.loc[
+            output["delivery_date"] <= delivery_day - timedelta(days=lag_days)
+        ]
         for index, row in same_day.iterrows():
             candidates = history.loc[
                 history["horizon_bucket_hours"].eq(row["horizon_bucket_hours"]), "error_mw"
@@ -96,8 +104,19 @@ def add_prior_error_bands(errors: pd.DataFrame, min_samples: int = 20) -> pd.Dat
                 output.loc[index, "p10_error_mw"] = candidates.quantile(0.10)
                 output.loc[index, "p90_error_mw"] = candidates.quantile(0.90)
                 output.loc[index, "band_sample_count"] = len(candidates)
-        prior.append(same_day)
     return output
+
+
+def procurement_buffer_mw(decision: pd.DataFrame) -> float | None:
+    """Return the maximum 90% thermal buffer implied by lower error tails.
+
+    Error is actual minus forecast. Therefore wind shortfall is a *negative*
+    error; P10 is the lower tail and `-P10` is the associated thermal buffer.
+    """
+    lower_tail = decision["p10_error_mw"].dropna()
+    if lower_tail.empty:
+        return None
+    return max(0.0, float(-lower_tail.min()))
 
 
 def decision_for_day(

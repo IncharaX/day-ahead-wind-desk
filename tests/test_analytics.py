@@ -3,7 +3,13 @@ from datetime import date, datetime, timezone
 import pandas as pd
 import pytest
 
-from backend.analytics import add_prior_error_bands, compute_errors, metrics, select_latest_forecast
+from backend.analytics import (
+    add_prior_error_bands,
+    compute_errors,
+    metrics,
+    procurement_buffer_mw,
+    select_latest_forecast,
+)
 
 
 def utc(value: str) -> pd.Timestamp:
@@ -45,19 +51,24 @@ def test_half_hour_actuals_use_the_hourly_source_forecast() -> None:
     assert result["error_mw"].tolist() == [10, -10]
 
 
-def test_bands_only_use_prior_delivery_days() -> None:
-    times = [utc("2026-01-01T00:00:00"), utc("2026-01-02T00:00:00")]
+def test_bands_exclude_the_incomplete_prior_delivery_day() -> None:
+    times = [utc("2026-01-01T00:00:00"), utc("2026-01-02T00:00:00"), utc("2026-01-03T00:00:00")]
     errors = pd.DataFrame(
         {
             "startTime": times,
-            "delivery_date": [date(2026, 1, 1), date(2026, 1, 2)],
-            "horizon_bucket_hours": [20.0, 20.0],
-            "error_mw": [10.0, 1000.0],
+            "delivery_date": [date(2026, 1, 1), date(2026, 1, 2), date(2026, 1, 3)],
+            "horizon_bucket_hours": [20.0, 20.0, 20.0],
+            "error_mw": [10.0, 1000.0, 30.0],
         }
     )
     result = add_prior_error_bands(errors, min_samples=1)
-    assert pd.isna(result.loc[0, "p90_error_mw"])
-    assert result.loc[1, "p90_error_mw"] == 10.0
+    assert pd.isna(result.loc[1, "p90_error_mw"])
+    assert result.loc[2, "p90_error_mw"] == 10.0
+
+
+def test_procurement_buffer_uses_negative_p10_error() -> None:
+    decision = pd.DataFrame({"p10_error_mw": [-800.0, -1200.0, 200.0]})
+    assert procurement_buffer_mw(decision) == 1200.0
 
 
 def test_metrics_excludes_missing_matches() -> None:

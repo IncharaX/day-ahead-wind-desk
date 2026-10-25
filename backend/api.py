@@ -18,6 +18,7 @@ from backend.analytics import (
     error_by_hour,
     json_safe,
     metrics,
+    procurement_buffer_mw,
     select_latest_forecast,
     serialise_records,
 )
@@ -95,6 +96,7 @@ def decision(
         "cutoff": decision_cutoff(delivery_day, cutoff).isoformat(),
         "slots": serialise_records(result),
         "metrics": metrics(result),
+        "buffer_mw": procurement_buffer_mw(result),
         "method": "Hourly WINDFOR values are held across each following two FUELHH half-hours.",
     }
 

@@ -8,7 +8,7 @@ A leakage-safe decision-support desk for a UK utility buying day-ahead power. It
 
 - Selects the latest Elexon `WINDFOR` forecast published no later than a configurable D-1 UK cutoff (default **09:30 Europe/London**).
 - Shows a 48 half-hour decision profile, optional actuals, and a prior-only P10–P90 uncertainty band.
-- Turns the P90 forecast error into a clear procurement action: “buy an extra X MW on top of the thermal gap.”
+- Turns the lower-tail forecast error into a clear procurement action: “buy an extra X MW on top of the thermal gap.”
 - Provides accuracy KPIs, error by hour, horizon analysis, and forecast-publication evolution.
 
 ## Run locally
@@ -37,9 +37,9 @@ Only Elexon data is used. `FUELHH` (filtered to `WIND`) provides actual half-hou
 .venv/bin/python -m backend.ingest
 ```
 
-The retrieval starts on 30 December 2025 so 1 January targets can use D-1 forecasts. Forecast error is `actual − forecast`, so a positive P90 error is the extra wind shortfall that a prudent buyer buffers.
+The retrieval starts on 30 December 2025 so 1 January targets can use D-1 forecasts. Forecast error is `actual − forecast`; a wind shortfall is therefore a negative error. The 90% thermal buffer is `max(0, −P10(error))` for the relevant horizon.
 
-WINDFOR's source targets are hourly and FUELHH is half-hourly. The app transparently carries each hourly source value across its two matching half-hours; it does not fabricate a higher-resolution forecast. P10/P90 bands use delivery days earlier than the day being assessed—never the same or future days.
+WINDFOR's source targets are hourly and FUELHH is half-hourly. The app transparently carries each hourly source value across its two matching half-hours; it does not fabricate a higher-resolution forecast. P10/P90 bands only use fully observed delivery days through D−2, never D−1, the same day, or future days.
 
 See [assumptions](docs/assumptions.md) and the [cutoff ADR](docs/adr/0001-decision-cutoff.md).
 

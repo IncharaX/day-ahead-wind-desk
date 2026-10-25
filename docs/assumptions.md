@@ -19,15 +19,14 @@ All timestamps are retained in UTC for storage and comparisons. The user-facing 
 
 ## Accuracy and uncertainty
 
-- Error is `actual_mw - forecast_mw`: a positive error means wind was under-forecast and the thermal purchase was too small.
+- Error is `actual_mw - forecast_mw`: a positive error means wind was under-forecast, so the buyer would have over-purchased thermal generation; negative error means a wind shortfall.
 - MAE, RMSE, bias, and normalized MAE are calculated only where both a selected forecast and an actual are present.
-- P10/P90 error bands are estimated using **only prior delivery days**. The initial policy uses an expanding history with a minimum number of observations, falling back to an all-prior-horizons pool when a horizon bucket is sparse. The precise fallback is exposed in the API response.
+- P10/P90 error bands are estimated using delivery days through **D-2** only. At a D-1 morning decision, D-1 actuals are incomplete and are excluded to avoid leakage. The initial policy uses an expanding history with a minimum number of observations, falling back to an all-prior-horizons pool when a horizon bucket is sparse. The precise fallback is exposed in the API response.
 - The headline horizon is `startTime - publishTime`; for a 09:30 D-1 decision it should broadly land in the 14–38 hour range.
-- A 90% procurement buffer is the prior-history P90 of `actual - forecast` for the appropriate horizon. It is added to the thermal gap, never presented as demand data.
+- A 90% procurement buffer is `max(0, -P10(actual - forecast))` for the relevant horizon. It is added to the thermal gap, never presented as demand data.
 
 ## Limitations
 
 - Missing, duplicate, or non-30-minute records are flagged during ingestion rather than silently imputed.
 - The product does not infer demand. A user-provided demand profile is optional and remains clearly labelled as user input.
 - This is a historical decision-support backtest, not a probabilistic forecast model or a trading recommendation.
-
