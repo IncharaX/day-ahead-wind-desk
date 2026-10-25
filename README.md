@@ -2,6 +2,8 @@
 
 A leakage-safe decision-support desk for a UK utility buying day-ahead power. It answers: *what wind forecast was available when the D-1 decision was made, and how much additional thermal cover is prudent?*
 
+**Live demo:** [day-ahead-wind-desk.vercel.app](https://day-ahead-wind-desk.vercel.app)
+
 ## What it does
 
 - Selects the latest Elexon `WINDFOR` forecast published no later than a configurable D-1 UK cutoff (default **09:30 Europe/London**).
