@@ -14,3 +14,5 @@ data/raw/
 build/
 *.egg-info/
 *.tsbuildinfo
+.vercel
+.env*
