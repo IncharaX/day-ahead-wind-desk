@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.analytics import (
     compute_errors,
@@ -21,6 +23,7 @@ from backend.analytics import (
 )
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "snapshot"
+FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend" / "dist"
 LONDON = ZoneInfo("Europe/London")
 
 app = FastAPI(title="Wind Forecast Decision Desk API", version="0.1.0")
@@ -61,6 +64,13 @@ def historical_errors(cutoff: time) -> pd.DataFrame:
 def health() -> dict[str, str]:
     forecasts, actuals = snapshot()
     return {"status": "ok", "forecasts": str(len(forecasts)), "actuals": str(len(actuals))}
+
+
+@app.get("/")
+def frontend() -> FileResponse:
+    if not (FRONTEND_DIR / "index.html").is_file():
+        raise HTTPException(status_code=404, detail="Frontend build is unavailable")
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 @app.get("/decision")
@@ -121,3 +131,7 @@ def evolution(delivery_day: date = Query(...)) -> dict:
     target["forecast_slot"] = target["startTime"].dt.floor("h")
     joined = target.merge(actual[["forecast_slot", "actual_mw"]], on="forecast_slot", how="left")
     return {"delivery_day": delivery_day.isoformat(), "points": serialise_records(joined)}
+
+
+if FRONTEND_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
