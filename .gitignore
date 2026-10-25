@@ -13,3 +13,4 @@ test-results/
 data/raw/
 build/
 *.egg-info/
+*.tsbuildinfo
