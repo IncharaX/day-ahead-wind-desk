@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Leakage-safe day-ahead wind purchasing decision support"
 requires-python = ">=3.9"
 dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
   "httpx>=0.27,<1",
   "numpy>=1.26,<3",
   "pandas>=2.1,<3",
@@ -26,3 +28,6 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint]
+extend-ignore = ["B008"]
