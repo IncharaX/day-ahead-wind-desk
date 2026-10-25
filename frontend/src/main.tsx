@@ -7,7 +7,9 @@ type Slot = { startTime: string; forecast_mw: number; actual_mw?: number; p10_er
 type Decision = { delivery_day: string; cutoff: string; slots: Slot[]; metrics: Record<string, number | null>; method: string }
 type Accuracy = { metrics: Record<string, number | null>; errors: any[]; by_hour: any[]; by_horizon: any[]; by_wind: any[] }
 type Evolution = { points: any[] }
-const API = import.meta.env.VITE_API_URL || '/api'
+// Vite proxies `/api` in local development; the production container serves
+// FastAPI and the static site from the same origin.
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : '')
 
 function Chart({ option }: { option: any }) {
   const ref = useRef<HTMLDivElement>(null)
