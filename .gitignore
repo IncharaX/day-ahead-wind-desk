@@ -11,5 +11,5 @@ coverage/
 playwright-report/
 test-results/
 data/raw/
-*.parquet
-
+build/
+*.egg-info/
