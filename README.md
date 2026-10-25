@@ -57,4 +57,15 @@ This is a historical decision-support backtest, not a trading recommendation. It
 
 ## AI usage disclosure
 
-This project was implemented with assistance from OpenAI Codex. AI assistance was used to scaffold the frontend and backend, draft documentation, and propose tests; the data selection, assumptions, leakage controls, validation, and final verification are represented explicitly in the source and documentation.
+I used OpenAI Codex as an engineering assistant during this take-home exercise.
+
+My contributions included:
+- interpreting the assignment and defining the product scope;
+- deciding the D-1 decision workflow and approving the 09:30 UK cutoff assumption;
+- directing the implementation priorities and reviewing the product flow, dashboard design, and data presentation;
+- validating the live application, creating the GitHub repository, authorising the Vercel deployment, and reviewing the final output;
+- reviewing the methodology, limitations, and submission materials.
+
+Codex assisted with implementation, including the React frontend, FastAPI backend, Docker/CI configuration, testing, documentation, and deployment troubleshooting.
+
+All material methodology choices are documented in the repository. The implementation was tested against the included Elexon snapshot and manually reviewed before submission.
