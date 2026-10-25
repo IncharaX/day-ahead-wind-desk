@@ -51,6 +51,20 @@ Elexon API → async ingestion CLI → Parquet snapshot → FastAPI JSON API →
 
 `backend/analytics.py` contains the pure calculation layer and `tests/test_analytics.py` covers as-of selection, missing data, half-hour mapping, and prior-only bands. GitHub Actions runs linting, tests, frontend build, and Docker build.
 
+## File map
+
+| Path | Purpose |
+| --- | --- |
+| `backend/ingest.py` | Async Elexon fetch, validation, and Parquet snapshot refresh CLI. |
+| `backend/analytics.py` | Pure as-of selection, error metrics, and prior-only uncertainty-band logic. |
+| `backend/api.py` | FastAPI endpoints and production static-dashboard serving. |
+| `frontend/src/` | React decision desk, controls, and ECharts visualisations. |
+| `data/snapshot/` | Versioned January 2026 Elexon Parquet snapshot and metadata. |
+| `tests/` | Leakage, missing-data, resolution-mapping, and band-history tests. |
+| `docs/` | Assumptions, methodology, and architecture decision record. |
+| `.github/workflows/ci.yml` | CI checks: lint, tests, frontend build, and Docker build. |
+| `Dockerfile.vercel` | Single-container Vercel deployment definition. |
+
 ## Limitations and next steps
 
 This is a historical decision-support backtest, not a trading recommendation. It does not invent demand, weather, capacity, or price data. Production extensions would add live snapshot refresh, richer weather features, probabilistic modelling, and user authentication/audit trails.
