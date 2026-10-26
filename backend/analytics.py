@@ -48,8 +48,11 @@ def compute_errors(selected: pd.DataFrame, actuals: pd.DataFrame) -> pd.DataFram
     )
     result["error_mw"] = result["actual_mw"] - result["forecast_mw"]
     result["abs_error_mw"] = result["error_mw"].abs()
-    result["delivery_date"] = result["startTime"].dt.date
-    result["hour"] = result["startTime"].dt.hour
+    # January is GMT, so this equals UTC for the supplied snapshot. Converting
+    # explicitly keeps delivery dates and hours correct when BST dates are added.
+    london_time = result["startTime"].dt.tz_convert("Europe/London")
+    result["delivery_date"] = london_time.dt.date
+    result["hour"] = london_time.dt.hour
     result["horizon_bucket_hours"] = (result["horizon_hours"] * 2).round() / 2
     return result.sort_values("startTime").reset_index(drop=True)
 
@@ -117,6 +120,14 @@ def procurement_buffer_mw(decision: pd.DataFrame) -> float | None:
     if lower_tail.empty:
         return None
     return max(0.0, float(-lower_tail.min()))
+
+
+def procurement_buffer_slot(decision: pd.DataFrame) -> pd.Timestamp | None:
+    """Return the UK delivery timestamp of the worst lower-tail buffer slot."""
+    valid = decision.dropna(subset=["p10_error_mw"])
+    if valid.empty or "startTime" not in valid:
+        return None
+    return valid.loc[valid["p10_error_mw"].idxmin(), "startTime"]
 
 
 def decision_for_day(

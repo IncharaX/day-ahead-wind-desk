@@ -19,6 +19,7 @@ from backend.analytics import (
     json_safe,
     metrics,
     procurement_buffer_mw,
+    procurement_buffer_slot,
     select_latest_forecast,
     serialise_records,
 )
@@ -91,12 +92,14 @@ def decision(
     limited = prior.loc[prior["delivery_date"] <= delivery_day]
     bands = add_prior_error_bands(limited)
     result = bands.loc[bands["delivery_date"] == delivery_day]
+    worst_slot = procurement_buffer_slot(result)
     return {
         "delivery_day": delivery_day.isoformat(),
         "cutoff": decision_cutoff(delivery_day, cutoff).isoformat(),
         "slots": serialise_records(result),
         "metrics": metrics(result),
         "buffer_mw": procurement_buffer_mw(result),
+        "buffer_slot_start": worst_slot.isoformat() if worst_slot is not None else None,
         "method": "Hourly WINDFOR values are held across each following two FUELHH half-hours.",
     }
 

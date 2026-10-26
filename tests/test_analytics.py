@@ -8,6 +8,7 @@ from backend.analytics import (
     compute_errors,
     metrics,
     procurement_buffer_mw,
+    procurement_buffer_slot,
     select_latest_forecast,
 )
 
@@ -51,7 +52,7 @@ def test_half_hour_actuals_use_the_hourly_source_forecast() -> None:
     assert result["error_mw"].tolist() == [10, -10]
 
 
-def test_bands_exclude_the_incomplete_prior_delivery_day() -> None:
+def test_bands_exclude_previous_day() -> None:
     times = [utc("2026-01-01T00:00:00"), utc("2026-01-02T00:00:00"), utc("2026-01-03T00:00:00")]
     errors = pd.DataFrame(
         {
@@ -67,8 +68,21 @@ def test_bands_exclude_the_incomplete_prior_delivery_day() -> None:
 
 
 def test_procurement_buffer_uses_negative_p10_error() -> None:
-    decision = pd.DataFrame({"p10_error_mw": [-800.0, -1200.0, 200.0]})
-    assert procurement_buffer_mw(decision) == 1200.0
+    decision = pd.DataFrame(
+        {
+            "startTime": [utc("2026-01-16T12:30:00"), utc("2026-01-16T13:00:00")],
+            "forecast_mw": [10000.0, 10000.0],
+            "p10_error_mw": [-1500.0, 200.0],
+            "p90_error_mw": [900.0, 900.0],
+        }
+    )
+    assert procurement_buffer_mw(decision) == 1500.0
+    assert procurement_buffer_slot(decision) == utc("2026-01-16T12:30:00")
+
+
+def test_procurement_buffer_is_zero_when_p10_error_is_positive() -> None:
+    decision = pd.DataFrame({"p10_error_mw": [25.0, 100.0]})
+    assert procurement_buffer_mw(decision) == 0.0
 
 
 def test_metrics_excludes_missing_matches() -> None:
