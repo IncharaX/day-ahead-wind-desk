@@ -39,7 +39,7 @@ Only Elexon data is used. `FUELHH` (filtered to `WIND`) provides actual half-hou
 
 The retrieval starts on 30 December 2025 so 1 January targets can use D-1 forecasts. Forecast error is `actual − forecast`; a wind shortfall is therefore a negative error. The 90% thermal buffer is `max(0, −P10(error))` for the relevant horizon.
 
-WINDFOR's source targets are hourly and FUELHH is half-hourly. The app transparently carries each hourly source value across its two matching half-hours; it does not fabricate a higher-resolution forecast. P10/P90 bands only use fully observed delivery days through D−2, never D−1, the same day, or future days.
+WINDFOR's source targets are hourly and FUELHH is half-hourly. The app transparently carries each hourly source value across its two matching half-hours; it does not fabricate a higher-resolution forecast. P10/P90 bands only use fully observed delivery days through D−2, never D−1, the same day, or future days. Early-January delivery days may therefore have insufficient history for an uncertainty band.
 
 See [assumptions](docs/assumptions.md) and the [cutoff ADR](docs/adr/0001-decision-cutoff.md).
 
@@ -51,19 +51,20 @@ Elexon API → async ingestion CLI → Parquet snapshot → FastAPI JSON API →
 
 `backend/analytics.py` contains the pure calculation layer and `tests/test_analytics.py` covers as-of selection, missing data, half-hour mapping, and prior-only bands. GitHub Actions runs linting, tests, frontend build, and Docker build.
 
-## File map
+## Repository layout
 
 | Path | Purpose |
 | --- | --- |
-| `backend/ingest.py` | Async Elexon fetch, validation, and Parquet snapshot refresh CLI. |
-| `backend/analytics.py` | Pure as-of selection, error metrics, and prior-only uncertainty-band logic. |
-| `backend/api.py` | FastAPI endpoints and production static-dashboard serving. |
-| `frontend/src/` | React decision desk, controls, and ECharts visualisations. |
+| `backend/` | FastAPI app, ingestion CLI, and pure analytics functions. |
+| `frontend/` | React + TypeScript + ECharts dashboard and frontend tests. |
 | `data/snapshot/` | Versioned January 2026 Elexon Parquet snapshot and metadata. |
-| `tests/` | Leakage, missing-data, resolution-mapping, and band-history tests. |
+| `tests/` | Backend leakage, error-band, buffer, and resolution-mapping tests. |
 | `docs/` | Assumptions, methodology, and architecture decision record. |
-| `.github/workflows/ci.yml` | CI checks: lint, tests, frontend build, and Docker build. |
+| `notebooks/` | Reproducible Elexon exploration notebook. |
+| `.github/workflows/` | CI workflow for linting, tests, frontend build, and Docker build. |
+| `Dockerfile` | Local/portable production container image. |
 | `Dockerfile.vercel` | Single-container Vercel deployment definition. |
+| `docker-compose.yml` | Local API and frontend development services. |
 
 ## Limitations and next steps
 

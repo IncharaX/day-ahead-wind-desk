@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as echarts from "echarts";
 import "./styles.css";
+import { formatUkTime } from "./lib/time";
 
 type Slot = {
   startTime: string;
@@ -9,6 +10,7 @@ type Slot = {
   actual_mw?: number;
   p10_error_mw?: number;
   p90_error_mw?: number;
+  band_sample_count?: number;
   horizon_hours: number;
 };
 type Decision = {
@@ -17,6 +19,7 @@ type Decision = {
   slots: Slot[];
   metrics: Record<string, number | null>;
   buffer_mw: number | null;
+  buffer_slot_start: string | null;
   method: string;
 };
 type Accuracy = {
@@ -47,9 +50,7 @@ function Chart({ option }: { option: any }) {
   return <div className="chart" ref={ref} />;
 }
 const fmt = (value?: number | null) =>
-  value == null
-    ? "Insufficient history"
-    : `${Math.round(value).toLocaleString()} MW`;
+  value == null ? "n/a" : `${Math.round(value).toLocaleString()} MW`;
 const day = (offset = 0) => {
   const d = new Date("2026-01-16T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + offset);
@@ -74,6 +75,7 @@ function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [demand, setDemand] = useState("");
+  const demandMw = Number(demand) > 0 ? Number(demand) : null;
   const [hour, minute] = cutoff.split(":");
   useEffect(() => {
     setLoading(true);
@@ -97,7 +99,24 @@ function App() {
   }, [deliveryDay, cutoff]);
   const decisionOption = useMemo(
     () => ({
-      tooltip: { trigger: "axis" },
+      tooltip: {
+        trigger: "axis",
+        formatter: (params: any[]) => {
+          const slot = decision?.slots[params[0]?.dataIndex];
+          if (!slot) return "";
+          const p10 = slot.p10_error_mw == null ? null : slot.forecast_mw + slot.p10_error_mw;
+          const p90 = slot.p90_error_mw == null ? null : slot.forecast_mw + slot.p90_error_mw;
+          const buffer = slot.p10_error_mw == null ? null : Math.max(0, -slot.p10_error_mw);
+          return [
+            `<strong>Time (UK): ${formatUkTime(slot.startTime)}</strong>`,
+            `Forecast: ${fmt(slot.forecast_mw)}`,
+            ...(reveal ? [`Actual: ${fmt(slot.actual_mw)}`] : []),
+            `P10: ${fmt(p10)}`,
+            `P90: ${fmt(p90)}`,
+            `Buffer: ${fmt(buffer)}`,
+          ].join("<br/>");
+        },
+      },
       legend: {
         data: ["Forecast", "P10–P90 band", ...(reveal ? ["Actual"] : [])],
       },
@@ -106,10 +125,7 @@ function App() {
       xAxis: {
         type: "category",
         data: decision?.slots.map((s) =>
-          new Date(s.startTime).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+          formatUkTime(s.startTime),
         ),
       },
       yAxis: { type: "value", name: "MW" },
@@ -119,6 +135,7 @@ function App() {
           type: "line",
           stack: "band",
           symbol: "none",
+          tooltip: { show: false },
           lineStyle: { opacity: 0 },
           data: decision?.slots.map((s) =>
             s.p10_error_mw == null ? 0 : s.forecast_mw + s.p10_error_mw,
@@ -131,6 +148,8 @@ function App() {
           symbol: "none",
           areaStyle: { color: "#8b5cf6", opacity: 0.16 },
           lineStyle: { opacity: 0 },
+          itemStyle: { color: "#8b5cf6" },
+          tooltip: { show: false },
           data: decision?.slots.map((s) =>
             s.p90_error_mw == null || s.p10_error_mw == null
               ? 0
@@ -140,24 +159,30 @@ function App() {
         {
           name: "Forecast",
           type: "line",
-          smooth: true,
+          step: "start",
+          smooth: false,
           data: decision?.slots.map((s) => s.forecast_mw),
-          lineStyle: { color: "#6d5dfc", width: 3 },
+          lineStyle: { color: "#2563eb", width: 3 },
+          itemStyle: { color: "#2563eb" },
         },
         ...(reveal
           ? [
               {
                 name: "Actual",
                 type: "line",
-                smooth: true,
+                smooth: false,
                 data: decision?.slots.map((s) => s.actual_mw),
-                lineStyle: { color: "#19b38a", width: 2 },
+                lineStyle: { color: "#1f2937", width: 2 },
+                itemStyle: { color: "#1f2937" },
               },
             ]
           : []),
+        ...(demandMw
+          ? [{ name: "Demand input", type: "line", symbol: "none", data: decision?.slots.map(() => demandMw), lineStyle: { color: "#d97706", type: "dashed", width: 2 }, tooltip: { show: false } }]
+          : []),
       ],
     }),
-    [decision, reveal],
+    [decision, demandMw, reveal],
   );
   const accuracyOption = useMemo(
     () => ({
@@ -185,7 +210,7 @@ function App() {
       xAxis: {
         type: "category",
         data: evolution?.points.map(
-          (x) => `${new Date(x.startTime).getUTCHours()}:00`,
+          (x) => formatUkTime(x.startTime),
         ),
       },
       yAxis: { type: "value", name: "MW" },
@@ -194,7 +219,7 @@ function App() {
           name: "Forecast publications",
           type: "scatter",
           data: evolution?.points.map((x) => [
-            new Date(x.startTime).getUTCHours(),
+            formatUkTime(x.startTime),
             x.forecast_mw,
           ]),
           symbolSize: 5,
@@ -216,7 +241,18 @@ function App() {
     [evolution],
   );
   const buffer = decision?.buffer_mw;
-  const p90 = buffer;
+  const bufferTime = formatUkTime(decision?.buffer_slot_start);
+  const bandSampleCount =
+    decision?.slots.find((slot) => slot.band_sample_count)?.band_sample_count ?? 0;
+  const hasBand = buffer != null;
+  const slotGaps =
+    decision?.slots.map((slot) => Math.max(0, (demandMw ?? 0) - slot.forecast_mw)) ?? [];
+  const riskAdjustedGaps =
+    decision?.slots.map((slot) =>
+      slot.p10_error_mw == null || demandMw == null
+        ? null
+        : Math.max(0, demandMw - (slot.forecast_mw + slot.p10_error_mw)),
+    ) ?? [];
   return (
     <main>
       <aside>
@@ -293,8 +329,9 @@ function App() {
                 <strong>{fmt(decision.metrics.bias_mw)}</strong>
               </div>
               <div>
-                <small>90% BUFFER</small>
-                <strong>{fmt(p90)}</strong>
+                <small>90% BUFFER (WORST SLOT)</small>
+                <strong>{hasBand ? fmt(buffer) : "n/a – insufficient history"}</strong>
+                {hasBand && <em>at {bufferTime} UK</em>}
               </div>
               <div>
                 <small>HEADLINE HORIZON</small>
@@ -319,12 +356,26 @@ function App() {
                 </label>
               </div>
               <Chart option={decisionOption} />
+              <p className="chart-note">
+                Forecast is hourly and held across two half-hours; not interpolated.
+              </p>
+              <p className="chart-note">
+                {hasBand
+                  ? `Uncertainty band sample count: ${bandSampleCount}`
+                  : "Insufficient history for uncertainty band"}
+              </p>
             </div>
             <div className="action">
               <b>Purchasing action</b>
               <span>
-                To be 90% covered, buy an extra <strong>{fmt(p90)}</strong> on
-                top of the thermal gap.
+                {hasBand ? (
+                  <>
+                    To be 90% covered, hold up to <strong>{fmt(buffer)}</strong> of extra thermal
+                    cover (worst slot, {bufferTime}) on top of the forecast thermal gap.
+                  </>
+                ) : (
+                  "n/a – insufficient history for a 90% thermal-cover buffer."
+                )}
               </span>
             </div>
             <div className="card demand">
@@ -336,19 +387,23 @@ function App() {
                 </p>
               </div>
               <input
-                placeholder="e.g. 35000"
+                placeholder="35000"
                 value={demand}
                 onChange={(e) => setDemand(e.target.value)}
               />
-              {demand && (
-                <strong>
-                  Indicative average thermal gap:{" "}
-                  {fmt(
-                    Number(demand) -
-                      decision.slots.reduce((s, x) => s + x.forecast_mw, 0) /
-                        decision.slots.length,
-                  )}
-                </strong>
+              {demandMw && (
+                <div className="demand-results">
+                  <strong>
+                    Average thermal gap: {fmt(slotGaps.reduce((sum, gap) => sum + gap, 0) / slotGaps.length)}
+                  </strong>
+                  <strong>Peak thermal gap: {fmt(Math.max(...slotGaps))}</strong>
+                  <strong>
+                    Risk-adjusted peak gap:{" "}
+                    {riskAdjustedGaps.some((gap) => gap != null)
+                      ? fmt(Math.max(...riskAdjustedGaps.filter((gap): gap is number => gap != null)))
+                      : "n/a – insufficient history"}
+                  </strong>
+                </div>
               )}
             </div>
           </>
