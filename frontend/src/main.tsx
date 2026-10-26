@@ -242,8 +242,10 @@ function App() {
   );
   const buffer = decision?.buffer_mw;
   const bufferTime = formatUkTime(decision?.buffer_slot_start);
-  const bandSampleCount =
-    decision?.slots.find((slot) => slot.band_sample_count)?.band_sample_count ?? 0;
+  const bandSampleCount = Math.max(
+    0,
+    ...(decision?.slots.map((slot) => slot.band_sample_count ?? 0) ?? []),
+  );
   const hasBand = buffer != null;
   const slotGaps =
     decision?.slots.map((slot) => Math.max(0, (demandMw ?? 0) - slot.forecast_mw)) ?? [];

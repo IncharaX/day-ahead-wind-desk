@@ -97,6 +97,8 @@ def add_prior_error_bands(
         history = output.loc[
             output["delivery_date"] <= delivery_day - timedelta(days=lag_days)
         ]
+        # This remains row-wise because each slot may need a horizon-matched
+        # sample set with a pooled-history fallback.
         for index, row in same_day.iterrows():
             candidates = history.loc[
                 history["horizon_bucket_hours"].eq(row["horizon_bucket_hours"]), "error_mw"
